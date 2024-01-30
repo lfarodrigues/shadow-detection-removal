@@ -140,10 +140,18 @@ def remove_shadows(image, labels, stats):
     return shadow_free_image
 
 
+
+
+def computeAverage(arr):
+    arr[arr == 0] = np.nan
+    arr_mean = np.nanmean(arr, axis=1)
+    arr_mean = np.nanmean(arr_mean, axis=0)
+
+    return arr_mean
+
 def remove_sombra(imagem, labels, stats):
-    #imagem = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
     shadow_free_image = np.copy(imagem)    # Extract the intensity component from the image
-    intensity_img = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
+    intensity_img = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY).astype('double') / 255.0 
 
     for label in range(1, len(stats)):
         # Extract the region corresponding to the current label
@@ -154,7 +162,6 @@ def remove_sombra(imagem, labels, stats):
 
         cv2.imshow('shadow reg', cv2.resize(shaded_region, (window_width, window_height)))
 
-
         # Get a border mask by subtracting the submask from the dilated submask
         dilated_submask = cv2.dilate(submask, np.ones((5, 5), np.uint8), iterations=1)
         border_mask = cv2.subtract(dilated_submask, submask)
@@ -164,27 +171,26 @@ def remove_sombra(imagem, labels, stats):
   
         cv2.imshow('unsh borders', cv2.resize(unshaded_borders, (window_width, window_height)))
 
-        #ratio = (L_unshaded - L_shaded) / L_shaded
-        #print(ratio)
+        #print(shaded_region)
         # (c) Reluzimento dos pixels
-        #relighted_region = cv2.multiply(shaded_region, ratio+1)
+        L_unshaded = computeAverage(unshaded_borders)
+        L_shaded = computeAverage(shaded_region)
 
-        #cv2.imshow('relight', cv2.resize(relighted_region, (window_width, window_height)))
+        ratio = ((L_unshaded - L_shaded) / L_shaded)
 
-        L_unshaded = np.mean(unshaded_borders)
-        L_shaded = np.mean(shaded_region)
         print(L_unshaded)
         print(L_shaded)
-        ratio = (np.clip(abs(L_unshaded - L_shaded) / L_shaded, 0, 1)).astype(float) + 1
 
-        print(ratio)
+        print(ratio+1)
 
+        relighted_region = np.zeros_like(shadow_free_image)
+        
+        subtracted_img = cv2.subtract(shadow_free_image, shaded_region_org)
         for c in range(imagem.shape[2]):
-            relighted_region = cv2.multiply(shaded_region_org[:, :, c], ratio)
-            cv2.imshow('relighted region', cv2.resize(relighted_region, (window_width, window_height)))
-            subtracted_img = cv2.subtract(shadow_free_image[:, :, c], shaded_region_org[:, :, c])
-            cv2.imshow('subtracted', cv2.resize(subtracted_img, (window_width, window_height)))
-            shadow_free_image[:, :, c] = cv2.add(subtracted_img, relighted_region)
+            relighted_region[:, :, c] = np.multiply(shaded_region_org[:, :, c], ratio+1)
+
+        shadow_free_image = cv2.add(subtracted_img, relighted_region)
+        cv2.imshow('relighted region', cv2.resize(relighted_region, (window_width, window_height)))
 
         cv2.imshow('sdw free', cv2.resize(shadow_free_image, (window_width, window_height)))
 
@@ -193,7 +199,7 @@ def remove_sombra(imagem, labels, stats):
     
     return shadow_free_image
 
-image_path = 'imgs/aerial03.jpg'  # Replace with the path to your image
+image_path = 'imgs/aerial02.jpg'  # Replace with the path to your image
 rgb_image = cv2.imread(image_path)
 
 # Example usage
@@ -233,6 +239,7 @@ enhanced = remove_sombra(rgb_image, labels, stats)
 #enhanced = remove_shadows(rgb_image, labels, stats)
 
 # Display 
+cv2.imshow("Original", cv2.resize(rgb_image, (window_width, window_height)))
 cv2.imshow('Logarithm of Spectral Ratio (Srlog)', cv2.resize((Srlog * 255).astype(np.uint8), (window_width, window_height)))
 cv2.imshow('Bin Mask', cv2.resize(binary_mask, (window_width, window_height)))
 cv2.imshow('Closed Mask', cv2.resize(closed_mask, (window_width, window_height)))
