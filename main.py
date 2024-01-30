@@ -160,7 +160,7 @@ def remove_sombra(imagem, labels, stats):
         shaded_region_org = cv2.bitwise_and(imagem, imagem, mask=submask)
         shaded_region = cv2.bitwise_and(intensity_img, intensity_img, mask=submask)
 
-        cv2.imshow('shadow reg', cv2.resize(shaded_region, (window_width, window_height)))
+        #cv2.imshow('shadow reg', cv2.resize(shaded_region, (window_width, window_height)))
 
         # Get a border mask by subtracting the submask from the dilated submask
         dilated_submask = cv2.dilate(submask, np.ones((5, 5), np.uint8), iterations=1)
@@ -169,19 +169,19 @@ def remove_sombra(imagem, labels, stats):
         # Ensure unshaded_borders has the same size and type as the region
         unshaded_borders = cv2.bitwise_and(intensity_img, intensity_img, mask=border_mask)
   
-        cv2.imshow('unsh borders', cv2.resize(unshaded_borders, (window_width, window_height)))
+        #cv2.imshow('unsh borders', cv2.resize(unshaded_borders, (window_width, window_height)))
 
         #print(shaded_region)
         # (c) Reluzimento dos pixels
         L_unshaded = computeAverage(unshaded_borders)
         L_shaded = computeAverage(shaded_region)
 
-        ratio = ((L_unshaded - L_shaded) / L_shaded)
+        ratio = np.clip((abs(L_unshaded - L_shaded) / L_shaded), 0, 1)
 
-        print(L_unshaded)
-        print(L_shaded)
+        #print(L_unshaded)
+        #print(L_shaded)
 
-        print(ratio+1)
+        #print(ratio+1)
 
         relighted_region = np.zeros_like(shadow_free_image)
         
@@ -190,16 +190,16 @@ def remove_sombra(imagem, labels, stats):
             relighted_region[:, :, c] = np.multiply(shaded_region_org[:, :, c], ratio+1)
 
         shadow_free_image = cv2.add(subtracted_img, relighted_region)
-        cv2.imshow('relighted region', cv2.resize(relighted_region, (window_width, window_height)))
+        #cv2.imshow('relighted region', cv2.resize(relighted_region, (window_width, window_height)))
 
-        cv2.imshow('sdw free', cv2.resize(shadow_free_image, (window_width, window_height)))
+        #cv2.imshow('sdw free', cv2.resize(shadow_free_image, (window_width, window_height)))
 
-        cv2.waitKey()
+        #cv2.waitKey()
         # Multiply each pixel in the original image within the shaded region by the illumination ratio
     
     return shadow_free_image
 
-image_path = 'imgs/aerial02.jpg'  # Replace with the path to your image
+image_path = 'imgs/aerial06.jpg'  # Replace with the path to your image
 rgb_image = cv2.imread(image_path)
 
 # Example usage
