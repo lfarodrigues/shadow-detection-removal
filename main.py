@@ -97,16 +97,16 @@ def calculate_illumination_ratio(unshaded_region, shaded_region, p=1):
     return ratio
 
 def remove_shadows(image, labels, stats):
-    shadow_free_image = np.copy(image)
+    shadow_free_image = np.zeros_like(image, dtype=np.float32)    # Extract the intensity component from the image
+    intensity_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     for label in range(1, len(stats)):
         # Extract the region corresponding to the current label
         region_mask = np.uint8(labels == label) * 255
-        #cv2.imshow('region mas', cv2.resize(region_mask, (window_width, window_height)))
 
-        region = cv2.bitwise_and(image, image, mask=region_mask)
+        region = cv2.bitwise_and(intensity_image, intensity_image, mask=region_mask)
 
-        #cv2.imshow('region', cv2.resize(region, (window_width, window_height)))
+        cv2.imshow('shadow reg', cv2.resize(region, (window_width, window_height)))
 
         # Get the statistics for the current region
         left, top, width, height, area = stats[label]
@@ -115,11 +115,9 @@ def remove_shadows(image, labels, stats):
         submask = region_mask
         dilated_submask = cv2.dilate(submask, np.ones((5, 5), np.uint8), iterations=1)
         border_mask = dilated_submask - submask
-
-        cv2.imshow('border mask', cv2.resize(border_mask, (window_width, window_height)))
  
         # Ensure unshaded_borders has the same size and type as the region
-        unshaded_borders = cv2.bitwise_and(image, image, mask=border_mask)
+        unshaded_borders = cv2.bitwise_and(intensity_image, intensity_image, mask=border_mask)
   
         cv2.imshow('unsh borders', cv2.resize(unshaded_borders, (window_width, window_height)))
 
@@ -127,34 +125,75 @@ def remove_shadows(image, labels, stats):
         illumination_ratio = calculate_illumination_ratio(unshaded_borders, region, p=1)
 
         k = 0
-        relight_shadow = ((illumination_ratio + 1)/(k*illumination_ratio+1)) * region
-        #k = 1
-        #relight_border = ((illumination_ratio + 1)/(k*illumination_ratio+1)) * unshaded_borders
-
-        #cv2.imshow('rel shadow', cv2.resize(relight_shadow.astype(np.uint8), (window_width, window_height)))
-        #cv2.imshow('rel border', cv2.resize(relight_border.astype(np.uint8), (window_width, window_height)))
-
-
-        #cv2.waitKey()
-        #cv2.destroyAllWindows()
+        #relight_shadow = ((illumination_ratio + 1)/(k*illumination_ratio+1)) * region
+        k = 1
 
         # Assign the calculated pixels to the shadow-free image
         
-        illumination_ratio = 0.5
-
-        for i in range(image.shape[0]):
-            for j in range(image.shape[1]):
-                if region_mask[i, j] != 0:  # Verificar se o pixel está na região da máscara
-                    shadow_free_image[i, j] = (illumination_ratio + 1) * image[i, j]
-
-
-        cv2.imshow('pixels reg', cv2.resize(shadow_free_image.astype(np.uint8), (window_width, window_height)))
-
+        #for i in range(image.shape[0]):
+         #   for j in range(image.shape[1]):
+          #      if region_mask[i, j] != 0:  # Verificar se o pixel está na região da máscara
+           #         shadow_free_image[i, j] = (illumination_ratio+1) * image[i, j]
+        
         cv2.waitKey()
+        # Multiply each pixel in the original image within the shaded region by the illumination ratio
     return shadow_free_image
 
 
-image_path = 'imgs/aerial07.jpg'  # Replace with the path to your image
+def remove_sombra(imagem, labels, stats):
+    #imagem = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
+    shadow_free_image = np.copy(imagem)    # Extract the intensity component from the image
+    intensity_img = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
+
+    for label in range(1, len(stats)):
+        # Extract the region corresponding to the current label
+        submask = np.uint8(labels == label) * 255
+
+        shaded_region_org = cv2.bitwise_and(imagem, imagem, mask=submask)
+        shaded_region = cv2.bitwise_and(intensity_img, intensity_img, mask=submask)
+
+        cv2.imshow('shadow reg', cv2.resize(shaded_region, (window_width, window_height)))
+
+
+        # Get a border mask by subtracting the submask from the dilated submask
+        dilated_submask = cv2.dilate(submask, np.ones((5, 5), np.uint8), iterations=1)
+        border_mask = cv2.subtract(dilated_submask, submask)
+ 
+        # Ensure unshaded_borders has the same size and type as the region
+        unshaded_borders = cv2.bitwise_and(intensity_img, intensity_img, mask=border_mask)
+  
+        cv2.imshow('unsh borders', cv2.resize(unshaded_borders, (window_width, window_height)))
+
+        #ratio = (L_unshaded - L_shaded) / L_shaded
+        #print(ratio)
+        # (c) Reluzimento dos pixels
+        #relighted_region = cv2.multiply(shaded_region, ratio+1)
+
+        #cv2.imshow('relight', cv2.resize(relighted_region, (window_width, window_height)))
+
+        L_unshaded = np.mean(unshaded_borders)
+        L_shaded = np.mean(shaded_region)
+        print(L_unshaded)
+        print(L_shaded)
+        ratio = (np.clip(abs(L_unshaded - L_shaded) / L_shaded, 0, 1)).astype(float) + 1
+
+        print(ratio)
+
+        for c in range(imagem.shape[2]):
+            relighted_region = cv2.multiply(shaded_region_org[:, :, c], ratio)
+            cv2.imshow('relighted region', cv2.resize(relighted_region, (window_width, window_height)))
+            subtracted_img = cv2.subtract(shadow_free_image[:, :, c], shaded_region_org[:, :, c])
+            cv2.imshow('subtracted', cv2.resize(subtracted_img, (window_width, window_height)))
+            shadow_free_image[:, :, c] = cv2.add(subtracted_img, relighted_region)
+
+        cv2.imshow('sdw free', cv2.resize(shadow_free_image, (window_width, window_height)))
+
+        cv2.waitKey()
+        # Multiply each pixel in the original image within the shaded region by the illumination ratio
+    
+    return shadow_free_image
+
+image_path = 'imgs/aerial03.jpg'  # Replace with the path to your image
 rgb_image = cv2.imread(image_path)
 
 # Example usage
@@ -188,16 +227,17 @@ closed_mask = apply_morphological_closing(binary_mask)
 labels, stats = label_connected_regions(closed_mask)
 
 # Remove shadows from the image
-shadow_free_image = remove_shadows(rgb_image, labels, stats)
 
-# Display the calculated channels
-#cv2.imshow('CIE LCh - L Channel', cv2.resize((L_normalized * 255).astype(np.uint8), (window_width, window_height)))
-#cv2.imshow('CIE LCh - h Channel', cv2.resize((h_normalized * 255).astype(np.uint8), (window_width, window_height)))
+enhanced = remove_sombra(rgb_image, labels, stats)
+
+#enhanced = remove_shadows(rgb_image, labels, stats)
+
+# Display 
 cv2.imshow('Logarithm of Spectral Ratio (Srlog)', cv2.resize((Srlog * 255).astype(np.uint8), (window_width, window_height)))
 cv2.imshow('Bin Mask', cv2.resize(binary_mask, (window_width, window_height)))
 cv2.imshow('Closed Mask', cv2.resize(closed_mask, (window_width, window_height)))
 cv2.imshow('Labels', (labels * 255 / np.max(labels)).astype(np.uint8))
-cv2.imshow('Shadow-Free Image', cv2.resize(shadow_free_image, (window_width, window_height)))
+cv2.imshow('Shadow-Free Image', cv2.resize(enhanced, (window_width, window_height)))
 
 plt.subplots_adjust()
 plt.show()
